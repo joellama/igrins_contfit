@@ -7,7 +7,7 @@ Uses numpy, matplotlib, astropy, scipy, and pysptools (pip install pysptools)
 
 # Useage 
 
->>> python cont_fit.py SDCK_20180115_0109.spec.fits
+python cont_fit.py SDCK_20180115_0109.spec.fits
 
 Will produce 2 additional files:
   SDCK_20180115_0109.flat.fits a fits file with 4 extensions:

@@ -7,16 +7,18 @@ Uses numpy, matplotlib, astropy, scipy, and pysptools (pip install pysptools)
 
 # Useage 
 
-python cont_fit.py SDCK_20180115_0109.spec.fits
+    python cont_fit.py SDCK_20180115_0109.spec.fits
 
 Will produce 2 additional files:
 
-  SDCK_20180115_0109.flat.fits a fits file with 4 extensions:
+ SDCK_20180115_0109.flat.fits a fits file with 4 extensions:
   
-    1) Original spectrum
-  
-    2) Wavelength
-    
-    3) Blaze fit (useful if using the routine on A0s to then apply to target stars)
-    
-    4) Flattened spectrum
+  1) Original spectrum
+
+  2) Wavelength
+
+  3) Blaze fit (useful if using the routine on A0s to then apply to target stars)
+
+  4) Flattened spectrum
+
+ SDCK_20180115_0109.flat.png - plot of the original spectrum and the flattened spectrum

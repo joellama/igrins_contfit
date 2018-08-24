@@ -1,18 +1,19 @@
-from __future__ import print_function
 import numpy as np
 import matplotlib.pylab as plt
+from matplotlib.backends.backend_pdf import PdfPages
 from astropy.io import fits
 from scipy.spatial import ConvexHull
-import sys
-from scipy.interpolate import UnivariateSpline
+from scipy.optimize import curve_fit
 from scipy.interpolate import splev
 from scipy.interpolate import splrep
 from astropy.stats import sigma_clip
+from astropy.convolution import convolve, Box1DKernel
 import warnings
+import sys
 warnings.filterwarnings('ignore', category=UserWarning, append=True)
 
 
-def convex_hull_removal(pixel, wvl):
+def convex_hull_removal(w, f):
     """
     Remove the convex-hull of the signal by hull quotient.
     Written by Joe Llama (Lowell Observatory) and Tomas Cabrera (MIT)
@@ -26,51 +27,63 @@ def convex_hull_removal(pixel, wvl):
         scipy.interpolate spline function of the blaze fits
 
     """
-    from pysptools.spectro.hull_removal import _jarvis
-    points = list(zip(wvl, pixel))
+    points = list(zip(w, f))
     # close the polygone
     poly = [(points[0][0],0)]+points+[(points[-1][0],0)]
-    hull = _jarvis.convex_hull(poly)
+    hull = ConvexHull(points)
     # the last two points are on the x axis, remove it
-    hull = hull[1:-2]
-    x_hull = np.asarray([u for u,v in hull])
-    y_hull = np.asarray([v for u,v in hull])
-    ii = np.argsort(x_hull)
-    x_hull, ind = np.unique(x_hull[ii], return_index=True)
-    y_hull = y_hull[ii][ind]
-    tck = splrep(x_hull, y_hull, k=1, s=1)
+    hull.vertices.sort()
+    x_hull = np.asarray(w[hull.vertices[1:-2]])
+    y_hull = np.asarray(f[hull.vertices[1:-2]])
+    x_hull, ind = np.unique(x_hull, return_index=True)
+    y_hull = y_hull[ind]
+    # tck = splrep(x_hull, y_hull,  s=1, k=1)
+    tck = splrep(w[hull.vertices], f[hull.vertices], k=1)
     return tck
+
+def func(x, a):
+    return a*x
 
 if __name__ == "__main__":
     fh = sys.argv[1]
     print("Fitting %s" % fh)
-    plot = True
-    # plot = True
-    # fh = 'SDCK_20180115_0109.spec.fits'
-    a0v = fits.open(fh)
-    a0f = a0v[0].data
-    a0w = a0v[1].data
-    nord = a0f.shape[0]
-    hull = np.zeros_like(a0w)
-    flat = np.zeros_like(a0w)
-    if plot == True:
-        print('plotting')
-        fig, ax = plt.subplots(2, 1, sharex=True)
+    spec = fits.open(fh)
+    spec_f = spec[0].data
+    spec_f[np.isnan(spec_f)] = 0
+    spec_w = spec[1].data
+    nord = spec_w.shape[0]
+    band = spec[0].header['BAND']
+    if band == 'H':
+        orders = np.arange(98, 126, dtype=np.long)
+    else:
+        orders = np.arange(72, 97, dtype=np.long)
+    blaze = fits.open('SDC%s_blaze.fits' % band)[0].data
+    blaze[np.isnan(blaze)] = 0
+    flat = np.zeros_like(spec_f)
+    pdf_fh = fh.replace('.fits', '_flat.pdf')
+    with PdfPages(pdf_fh) as pdf:
         for jj in np.arange(0, nord, dtype=np.long):
-            sc = sigma_clip(a0f[jj, :], sigma=3, iters=5)
-            hull_tck = convex_hull_removal(sc[~sc.mask], a0w[jj, ~sc.mask])
-            hull[jj, :] = splev(a0w[jj, :], hull_tck)
-            ax[0].plot(a0w[jj, :], a0f[jj, :], c='blue')
-            ax[0].plot(a0w[jj, :], hull[jj, :], c='orange')
-            flat[jj, :] = sigma_clip(a0f[jj, :] - hull[jj, :],
-                sigma=3, iters=5)
-            ax[1].plot(a0w[jj, :], flat[jj, :], c='red')
-        fig.savefig(fh.replace('spec.fits', 'flat.png'), dpi=300)
-        print('Wrote %s to disk' % fh.replace('spec.fits', 'flat.png'))
-    a0v.append(fits.PrimaryHDU(hull))
-    a0v.append(fits.PrimaryHDU(flat))
-    a0v.writeto(fh.replace('spec', 'flat'), overwrite=True)
-    print('Wrote %s to disk' % fh.replace('spec', 'flat'))
-
-
-
+            hull_tck = convex_hull_removal(spec_w[jj, :], spec_f[jj, :])
+            hull_fit = splev(spec_w[jj, :], hull_tck)
+            blaze[jj, :] = convolve(blaze[jj, :], Box1DKernel(15))
+            # fit = curve_fit(func, blaze[jj, :], spec_f[jj,:])
+            # Blaze peaks just right of the center
+            mid = np.long(len(spec_f[jj, :]) / 2.)
+            ratio = np.max(hull_fit[(mid-200):(mid+400)]) / np.max(blaze[jj, (mid-200):(mid+400)])
+            flat[jj, :] = spec_f[jj, :] - ratio*blaze[jj, :]
+            fig, ax = plt.subplots(2, 1, sharex=True, figsize=(11.5, 8))
+            ax[0].plot(spec_w[jj, :], spec_f[jj, :], label='data')
+            ax[0].plot(spec_w[jj, :],  ratio * blaze[jj, :], label='Fit')
+            ax[0].legend(loc='upper left')
+            ax[0].set_ylabel("IGRINS Flux")
+            ax[0].set_title("%s - order %02d" % (fh, orders[jj]))
+            ax[1].plot(spec_w[jj, :], flat[jj, :], label='Residuals')
+            ax[1].axhline(0, lw=2, ls='--', c='k')
+            ax[1].set_xlabel("Wavelength (microns)")
+            ax[1].set_ylabel("Residual Flux")
+            fig.tight_layout()
+            pdf.savefig()
+            plt.close()
+spec.append(fits.PrimaryHDU(flat))
+spec.writeto(fh.replace('spec', 'flat'), overwrite=True)
+print('Wrote %s to disk' % fh.replace('spec', 'flat'))

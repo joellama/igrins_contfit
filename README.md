@@ -3,7 +3,7 @@ Python code to remove the blaze function from IGRINS spectra
 
 # Required modules 
 Designed to be run on Python 3. 
-Uses numpy, matplotlib, astropy, scipy, and pysptools (pip install pysptools)
+Uses numpy, matplotlib, astropy, scipy 
 
 # Useage 
 
@@ -11,14 +11,12 @@ Uses numpy, matplotlib, astropy, scipy, and pysptools (pip install pysptools)
 
 Will produce 2 additional files:
 
- SDCK_20180115_0109.flat.fits a fits file with 4 extensions:
+ SDCK_20180115_0109.flat.fits a fits file with 3 extensions:
   
   1) Original spectrum
 
   2) Wavelength
 
-  3) Blaze fit (useful if using the routine on A0s to then apply to target stars)
+  3) Flattened spectrum
 
-  4) Flattened spectrum
-
- SDCK_20180115_0109.flat.png - plot of the original spectrum and the flattened spectrum
+ SDCK_20180115_0109.flat.pdf - plot of the original spectrum and the flattened spectrum

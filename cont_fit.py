@@ -74,7 +74,7 @@ if __name__ == "__main__":
                 ratio /= np.max(blaze[jj, :])
                 fit = ratio*blaze[jj, :]
             except:
-                ratio /= np.max(blaze[jj-1, (mid-200):(mid+400)])
+                ratio /= np.max(blaze[jj-1, :])
                 fit = ratio*blaze[jj-1, :]
             flat[jj, :] = spec_f[jj, :] - fit
             fig, ax = plt.subplots(2, 1, sharex=True, figsize=(11.5, 8))

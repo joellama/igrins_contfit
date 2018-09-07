@@ -41,9 +41,6 @@ def convex_hull_removal(w, f):
     tck = splrep(w[hull.vertices], f[hull.vertices], k=1)
     return tck
 
-def func(x, a):
-    return a*x
-
 if __name__ == "__main__":
     fh = sys.argv[1]
     print("Fitting %s" % fh)
@@ -53,32 +50,41 @@ if __name__ == "__main__":
     spec_w = spec[1].data
     nord = spec_w.shape[0]
     band = spec[0].header['BAND']
+    if band == '': # Some McDonald data doesn't record the band in the header
+        band = fh.split('SDC')[1][0]
+    obs = spec[0].header['TELESCOP']
     if band == 'H':
-        orders = np.arange(98, 126, dtype=np.long)
+        orders = np.arange(98, 98 + nord, dtype=np.long)
     else:
-        orders = np.arange(72, 97, dtype=np.long)
-    blaze = fits.open('SDC%s_blaze.fits' % band)[0].data
+        orders = np.arange(72, 72 + nord, dtype=np.long)
+    blaze = fits.open('SDC%s_DCT_flat.fits' % band)[0].data
     blaze[np.isnan(blaze)] = 0
     flat = np.zeros_like(spec_f)
     pdf_fh = fh.replace('.fits', '_flat.pdf')
+    m = [all(z) for z in zip(np.arange(0, 2048) > 150, np.arange(0, 2048) < 1900)]
     with PdfPages(pdf_fh) as pdf:
         for jj in np.arange(0, nord, dtype=np.long):
-            hull_tck = convex_hull_removal(spec_w[jj, :], spec_f[jj, :])
-            hull_fit = splev(spec_w[jj, :], hull_tck)
-            blaze[jj, :] = convolve(blaze[jj, :], Box1DKernel(15))
-            # fit = curve_fit(func, blaze[jj, :], spec_f[jj,:])
-            # Blaze peaks just right of the center
-            mid = np.long(len(spec_f[jj, :]) / 2.)
-            ratio = np.max(hull_fit[(mid-200):(mid+400)]) / np.max(blaze[jj, (mid-200):(mid+400)])
-            flat[jj, :] = spec_f[jj, :] - ratio*blaze[jj, :]
+            hull_tck = convex_hull_removal(spec_w[jj, m], spec_f[jj, m])
+            hull_fit = splev(spec_w[jj, m], hull_tck)
+            # mid = np.long(len(spec_f[jj, m]) / 2.)
+            ratio = np.percentile(hull_fit, 98)
+            try:
+                # blaze[jj, :] = convolve(blaze[jj, :], Box1DKernel(1))
+                # Blaze peaks just right of the center
+                ratio /= np.max(blaze[jj, :])
+                fit = ratio*blaze[jj, :]
+            except:
+                ratio /= np.max(blaze[jj-1, (mid-200):(mid+400)])
+                fit = ratio*blaze[jj-1, :]
+            flat[jj, :] = spec_f[jj, :] - fit
             fig, ax = plt.subplots(2, 1, sharex=True, figsize=(11.5, 8))
             ax[0].plot(spec_w[jj, :], spec_f[jj, :], label='data')
-            ax[0].plot(spec_w[jj, :],  ratio * blaze[jj, :], label='Fit')
+            ax[0].plot(spec_w[jj, :],  fit, label='Fit')
             ax[0].legend(loc='upper left')
             ax[0].set_ylabel("IGRINS Flux")
             ax[0].set_title("%s - order %02d" % (fh, orders[jj]))
             ax[1].plot(spec_w[jj, :], flat[jj, :], label='Residuals')
-            ax[1].axhline(0, lw=2, ls='--', c='k')
+            ax[1].axhline(1, lw=2, ls='--', c='k')
             ax[1].set_xlabel("Wavelength (microns)")
             ax[1].set_ylabel("Residual Flux")
             fig.tight_layout()

@@ -57,7 +57,7 @@ if __name__ == "__main__":
         orders = np.arange(98, 98 + nord, dtype=np.long)
     else:
         orders = np.arange(72, 72 + nord, dtype=np.long)
-    blaze = fits.open('SDC%s_DCT_flat.fits' % band)[0].data
+    blaze = fits.open('SDC%s_DCT_FLAT.fits' % band)[0].data
     blaze[np.isnan(blaze)] = 0
     flat = np.zeros_like(spec_f)
     pdf_fh = fh.replace('.fits', '_flat.pdf')
